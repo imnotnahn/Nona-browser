@@ -1,0 +1,218 @@
+! Intelligent Whitelist Rules
+! Ensures essential functionality works on major websites
+! Prevents false positives and broken websites
+
+! === YouTube Essential Whitelists ===
+@@||youtube.com^
+@@||www.youtube.com^
+@@||m.youtube.com^
+@@||youtubei.googleapis.com^
+@@||youtube.googleapis.com^
+@@||yt3.ggpht.com^
+@@||ytimg.com^
+@@||yt3.googleusercontent.com^
+@@||googlevideo.com^
+@@||i.ytimg.com^
+@@||s.ytimg.com^
+@@||youtube.com/api/stats/watchtime^
+@@||youtube.com/youtubei/v1/player^
+@@||youtube.com/youtubei/v1/next^
+@@||youtube.com/youtubei/v1/browse^
+@@||youtube.com/youtubei/v1/search^
+@@||youtube.com/youtubei/v1/guide^
+@@||youtube.com/youtubei/v1/get_transcript^
+
+! === Google Services Essential ===
+@@||gstatic.com^
+@@||googleapis.com^
+@@||ajax.googleapis.com^
+@@||fonts.googleapis.com^
+@@||maps.googleapis.com^
+@@||recaptcha.net^
+@@||www.gstatic.com^
+@@||ssl.gstatic.com^
+@@||encrypted-tbn0.gstatic.com^
+
+! === CDN and Essential Resources ===
+@@||cdn.jsdelivr.net^
+@@||cdnjs.cloudflare.com^
+@@||unpkg.com^
+@@||bootstrapcdn.com^
+@@||fontawesome.com^
+@@||jquery.com^
+@@||code.jquery.com^
+
+! === Social Media Core Functionality ===
+@@||facebook.com/api^
+@@||facebook.com/ajax^
+@@||facebook.com/xhr^
+@@||graph.facebook.com^
+@@||www.facebook.com/api^
+@@||twitter.com/i/api^
+@@||api.twitter.com^
+@@||x.com/i/api^
+@@||instagram.com/api^
+
+! === Payment and E-commerce ===
+@@||paypal.com^
+@@||www.paypal.com^
+@@||stripe.com^
+@@||js.stripe.com^
+@@||checkout.stripe.com^
+@@||visa.com^
+@@||mastercard.com^
+@@||amazon.com/gp/buy^
+@@||amazon.com/checkout^
+@@||amazon.com/api^
+
+! === Microsoft Services ===
+@@||microsoft.com^
+@@||microsoftonline.com^
+@@||live.com^
+@@||outlook.com^
+@@||office.com^
+@@||xbox.com^
+@@||login.microsoftonline.com^
+@@||graph.microsoft.com^
+
+! === Essential File Types (Whitelist patterns) ===
+@@***.js$important
+@@***.css$important
+@@***.woff$important
+@@***.woff2$important
+@@***.ttf$important
+@@***.eot$important
+@@***.svg$important
+@@***.ico$important
+@@***.json$important
+@@***.xml$important
+
+! === Video Streaming Essentials ===
+@@*/videoplayback*
+@@*/manifest*
+@@*playlist.m3u8*
+@@***.mp4$important
+@@***.webm$important
+@@***.ts$important
+@@*/chunk*
+@@*/segment*
+
+! === Authentication and Security ===
+@@*/auth/*
+@@*/login/*
+@@*/oauth/*
+@@*/sso/*
+@@*/session/*
+@@*/csrf*
+@@*/xsrf*
+@@*/captcha*
+@@*/recaptcha*
+
+! === API Endpoints ===
+@@*/api/*
+@@*/xhr/*
+@@*/ajax/*
+@@*/graphql*
+@@*/rest/*
+@@*/v1/*
+@@*/v2/*
+@@*/v3/*
+
+! === Website Functionality ===
+@@*/search*
+@@*/autocomplete*
+@@*/suggestions*
+@@*/typeahead*
+@@*/feedback*
+@@*/comments*
+@@*/upload*
+@@*/download*
+
+! === Development and Analytics (Essential only) ===
+@@*/webpack*
+@@*/bundle*
+@@*/chunk*
+@@*/manifest.json
+@@*/sw.js
+@@*/serviceworker*
+
+! === E-learning Platforms ===
+@@||coursera.org^
+@@||udemy.com^
+@@||edx.org^
+@@||khanacademy.org^
+@@||duolingo.com^
+
+! === News and Media ===
+@@||bbc.com^
+@@||cnn.com^
+@@||reuters.com^
+@@||ap.org^
+@@||theguardian.com^
+
+! === Banking and Finance ===
+@@*/banking/*
+@@*/account/*
+@@*/balance/*
+@@*/transfer/*
+@@*/statement/*
+@@*/secure/*
+
+! === Healthcare ===
+@@*/patient/*
+@@*/medical/*
+@@*/health/*
+@@*/prescription/*
+@@*/appointment/*
+
+! === Government Services ===
+@@*.gov^
+@@*.edu^
+@@*.mil^
+@@*/tax/*
+@@*/irs/*
+@@*/social-security/*
+
+! === Popular Vietnamese Sites ===
+@@||vnexpress.net^
+@@||vietnamnet.vn^
+@@||dantri.com.vn^
+@@||tuoitre.vn^
+@@||thanhnien.vn^
+@@||vietcombank.com.vn^
+@@||techcombank.com.vn^
+@@||mbbank.com.vn^
+@@||tiki.vn^
+@@||shopee.vn^
+@@||lazada.vn^
+
+! === Development Tools ===
+@@||github.com^
+@@||gitlab.com^
+@@||stackoverflow.com^
+@@||npmjs.com^
+@@||packagist.org^
+@@||docker.com^
+
+! === Cloud Services ===
+@@||aws.amazon.com^
+@@||console.aws.amazon.com^
+@@||azure.microsoft.com^
+@@||cloud.google.com^
+@@||dropbox.com^
+@@||drive.google.com^
+
+! === Communication Tools ===
+@@||zoom.us^
+@@||teams.microsoft.com^
+@@||meet.google.com^
+@@||skype.com^
+@@||discord.com^
+@@||slack.com^
+
+! === Productivity ===
+@@||notion.so^
+@@||trello.com^
+@@||asana.com^
+@@||monday.com^
+@@||airtable.com^

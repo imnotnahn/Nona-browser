@@ -1,0 +1,27 @@
+{
+  "Name": "Dark",
+  "AccentColor": "#FF0078D4",
+  "BackgroundColor": "#1E1E1E",
+  "ForegroundColor": "#FFFFFF",
+  "TabActiveColor": "#2D2D2D",
+  "TabInactiveColor": "#202020",
+  "ButtonColor": "#3C3C3C",
+  "ButtonHoverColor": "#4A4A4A",
+  "ButtonBorderColor": "#5A5A5A",
+  "TextBoxColor": "#2D2D2D",
+  "TextBoxBorderColor": "#5A5A5A",
+  "MenuColor": "#2D2D2D",
+  "MenuHoverColor": "#3C3C3C",
+  "StatusBarColor": "#1E1E1E",
+  "BookmarkBarColor": "#252525",
+  "WindowBorderColor": "#5A5A5A",
+  "WindowOpacity": 1.0,
+  "ButtonCornerRadius": 4.0,
+  "WindowCornerRadius": 8.0,
+  "FontSize": 12,
+  "FontFamily": "Segoe UI",
+  "BackgroundImagePath": "",
+  "BackgroundImageOpacity": 0.1,
+  "BackgroundImageStretch": "UniformToFill"
+}
+

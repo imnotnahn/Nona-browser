@@ -1,0 +1,172 @@
+! Enhanced Ad Blocking Rules - Inspired by Brave Browser
+! Version: 2025.01.11
+! Description: Comprehensive ad blocking rules for better privacy and performance
+
+! === Google Ads & Analytics ===
+||doubleclick.net^
+||googlesyndication.com^
+||adservice.google.com^
+||googleadservices.com^
+||google-analytics.com^
+||googletagmanager.com^
+||googletagservices.com^
+||googletag.pubads^
+||adsystem.google.com^
+
+! === Facebook & Meta Tracking ===
+||facebook.net^
+||facebook.com/tr^
+||connect.facebook.net^
+||fbcdn.net/tr^
+||instagram.com/embed^
+
+! === Amazon Ads ===
+||amazon-adsystem.com^
+||amazonclix.com^
+||assoc-amazon.com^
+||amazon.co.jp/gp/aw/cr^
+
+! === Microsoft Ads ===
+||ads.msn.com^
+||bing.com/fd/ls/l^
+||msads.net^
+||msedge.net/autofill^
+
+! === Popular Ad Networks ===
+||adsystem.com^
+||adnxs.com^
+||adscdn.com^
+||adform.net^
+||2mdn.net^
+||adsafeprotected.com^
+||moatads.com^
+||outbrain.com^
+||taboola.com^
+||scorecardresearch.com^
+||quantserve.com^
+||chartbeat.com^
+||hotjar.com^
+||crazyegg.com^
+||mouseflow.com^
+||fullstory.com^
+||loggly.com^
+||bugsnag.com^
+||sentry.io^
+
+! === Social Media Widgets ===
+||platform.twitter.com/widgets^
+||twitter.com/i/jot^
+||linkedin.com/px^
+||pinterest.com/ct^
+||reddit.com/api/v1/sendbird^
+
+! === Video Ads (Selective blocking to avoid breaking functionality) ===
+||youtube.com/ptracking^
+||youtube.com/api/stats/ads^
+||youtube.com/pagead/^
+||youtube.com/get_midroll_info^
+||vimeo.com/log_plays^
+||dailymotion.com/logger^
+
+! === Popup & Notification Ads ===
+/popup
+/popunder
+/notification
+/push-notification
+/web-push
+/subscribe-popup
+
+! === Tracking Scripts (Specific patterns only) ===
+/ga.js
+/gtm.js
+/analytics.js
+/tracking.js
+/pixel.js
+/beacon.js
+/doubleclick/
+/googleads/
+/googlesyndication/
+/adsystem/
+
+! === Common Ad Patterns ===
+/ads/
+/advertisement/
+/sponsor/
+/promoted/
+/affiliate/
+/banner/
+/popup/
+/_ads/
+.ads.
+-ads-
+-ad-
+.ad.
+
+! === Cryptocurrency Mining ===
+||coinhive.com^
+||jsecoin.com^
+||coinerra.com^
+||crypto-loot.com^
+||webminepool.com^
+
+! === Malware & Suspicious Domains ===
+||malware.com^
+||phishing.com^
+||suspicious.com^
+||fake-download.com^
+
+! === Additional Tracking ===
+||mixpanel.com^
+||segment.com^
+||amplitude.com^
+||heap.io^
+||intercom.io^
+||zendesk.com/embeddable_framework^
+||freshworks.com^
+||drift.com^
+||crisp.chat^
+
+! === Performance Optimization ===
+! Block unnecessary fonts and resources
+/webfonts/
+/font-awesome/
+/bootstrap/
+/jquery-ui/
+
+! === Vietnamese Ad Networks ===
+||adsplay.net^
+||admicro.vn^
+||adtima.vn^
+||vcmedia.vn^
+||admixer.co.kr^
+
+! === More Comprehensive Patterns (Careful with wildcards) ===
+! Generic ad servers (removed overly broad patterns)
+||adserver*.
+||adservice*.
+||advertising*.
+||tracker*.
+||tracking*.
+||telemetry*.
+
+! === Cookie Consent Banners ===
+||cookiebot.com^
+||cookielaw.org^
+||onetrust.com^
+||trustarc.com^
+||cookiepro.com^
+
+! === Chat Widgets ===
+||tawk.to^
+||livechatinc.com^
+||olark.com^
+||purechat.com^
+||smartsupp.com^
+
+! === Newsletter Popups ===
+||mailchimp.com/mc-modal^
+||constantcontact.com^
+||aweber.com^
+||getresponse.com^
+||convertkit.com^
+

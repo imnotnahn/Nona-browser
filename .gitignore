@@ -1,0 +1,38 @@
+# Build artifacts
+bin/
+obj/
+publish/
+publish-single/
+Nona-Browser-Release/
+buildrelease.bat
+publish-tmp-fd/
+publish-tmp-single/
+
+# VS/IDE
+.vs/
+*.user
+*.suo
+*.userprefs
+
+# Logs
+*.log
+nona.log
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Rider/JetBrains
+.idea/
+
+# dotnet
+*.cache
+*.db
+**/TestResults/
+
+# NuGet
+packages/
+*.nupkg
+
+

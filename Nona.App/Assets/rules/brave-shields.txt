@@ -1,0 +1,195 @@
+! Brave Shields Compatible Rules
+! Enhanced blocking for maximum privacy and performance
+! Based on popular filter lists: EasyList, EasyPrivacy, uBlock Origin
+
+! === Comprehensive Ad Servers ===
+||2mdn.net^
+||adsystem.com^
+||amazon-adsystem.com^
+||doubleclick.net^
+||googlesyndication.com^
+||googleadservices.com^
+||googletagmanager.com^
+||googletagservices.com^
+||google-analytics.com^
+||facebook.com/tr^
+||connect.facebook.net^
+||scorecardresearch.com^
+||quantserve.com^
+||outbrain.com^
+||taboola.com^
+||adsafeprotected.com^
+||moatads.com^
+
+! === Social Media Tracking ===
+||platform.twitter.com/widgets^
+||twitter.com/i/jot^
+||linkedin.com/px^
+||pinterest.com/ct^
+||instagram.com/embed^
+||fbcdn.net/tr^
+
+! === Analytics & Metrics ===
+||chartbeat.com^
+||hotjar.com^
+||crazyegg.com^
+||mouseflow.com^
+||fullstory.com^
+||mixpanel.com^
+||segment.com^
+||amplitude.com^
+||heap.io^
+
+! === Video Ad Networks ===
+||youtube.com/ptracking^
+||youtube.com/api/stats^
+||youtube.com/youtubei/v1/log_event^
+||vimeo.com/log_plays^
+||dailymotion.com/logger^
+
+! === Cryptocurrency Miners ===
+||coinhive.com^
+||jsecoin.com^
+||coinerra.com^
+||crypto-loot.com^
+||webminepool.com^
+||authedmine.com^
+||ppoi.org^
+||minero.cc^
+
+! === Popup & Notification Services ===
+/popup
+/popunder
+/notification
+/push-notification
+/web-push
+/subscribe-popup
+/subscribe-modal
+
+! === Common Tracking Parameters ===
+/collect?
+/track?
+/event?
+/log?
+/pixel?
+/beacon?
+/analytics?
+/metrics?
+/telemetry?
+
+! === Generic Ad Patterns ===
+/ads/
+/advertisement/
+/sponsor/
+/promoted/
+/affiliate/
+/banner/
+/_ads/
+.ads.
+-ads-
+-ad-
+.ad.
+*ads*
+*advertisement*
+*tracking*
+*analytics*
+
+! === Third-party Widgets ===
+||intercom.io^
+||zendesk.com/embeddable_framework^
+||freshworks.com^
+||drift.com^
+||crisp.chat^
+||tawk.to^
+||livechatinc.com^
+||olark.com^
+
+! === Cookie Consent & GDPR ===
+||cookiebot.com^
+||cookielaw.org^
+||onetrust.com^
+||trustarc.com^
+||cookiepro.com^
+||quantcast.com^
+||cookieinformation.com^
+
+! === Email Marketing ===
+||mailchimp.com/mc-modal^
+||constantcontact.com^
+||aweber.com^
+||getresponse.com^
+||convertkit.com^
+||mailerlite.com^
+
+! === Performance & Resource Blocking ===
+/webfonts/
+/font-awesome/
+/bootstrap/css/
+/jquery-ui/
+/fontawesome/
+/googleapis.com/css?
+
+! === Vietnamese/Asian Ad Networks ===
+||adsplay.net^
+||admicro.vn^
+||adtima.vn^
+||vcmedia.vn^
+||admixer.co.kr^
+||naver.com/ads^
+||baidu.com/cpro^
+
+! === Malware & Suspicious ===
+||malvertising.com^
+||fake-flash-update.com^
+||browser-update-required.com^
+||security-warning.com^
+||your-computer-infected.com^
+
+! === Mobile App Ads ===
+||mobileads.google.com^
+||iads.apple.com^
+||ads.yahoo.com^
+||ads.microsoft.com^
+
+! === CDN-hosted Ads ===
+||cdn.adsystem.com^
+||static.adsystem.com^
+||media.adsystem.com^
+||assets.adsystem.com^
+
+! === Affiliate Marketing ===
+||affiliate.com^
+||commission-junction.com^
+||shareasale.com^
+||clickbank.com^
+||amazon.com/gp/aws/cart/add.html^
+
+! === Behavioral Tracking ===
+/fingerprint
+/device-fingerprint
+/canvas-fingerprint
+/audio-fingerprint
+/webgl-fingerprint
+/battery-api
+/geolocation-api
+
+! === Performance Optimization ===
+! Block heavy resources that slow down page loading
+/large-video-ads/
+/autoplay-video/
+/background-video/
+/heavy-animation/
+/cpu-intensive/
+
+! === Advanced Patterns ===
+! Block requests with suspicious patterns
+*utm_source*
+*utm_medium*
+*utm_campaign*
+*fbclid*
+*gclid*
+*msclkid*
+*dclid*
+*_ga*
+*_gid*
+*mc_eid*
