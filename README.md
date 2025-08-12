@@ -74,27 +74,32 @@ flowchart LR
 ```
 
 Performance comparison (measured)
-- Metrics are based on `result.txt` for Nona and Brave, with additional comparable figures for Edge and Firefox to contextualize behavior. Values are indicative and environment-dependent.
+- Metrics are based on `result.txt` and updated after correcting process accounting (see notes). Values are indicative and environment-dependent.
 
-| Browser | Cold start (ms) | Warm start (ms) | Idle CPU (%) | Idle RAM 1 tab (MB) | Idle RAM ~10 tabs (MB) | Package size (MB) |
+| Browser | Cold start (ms) | Warm start (ms) | Idle CPU (%) | Idle RAM 1 tab (MB) | Idle RAM ~10 tabs total (MB) | Package size (MB) |
 |---|---:|---:|---:|---:|---:|---:|
-| Nona | 945 | 1030 | 0.2 | 202 | 208 | 165 (single-file) |
-| Brave | 423 | 286 | 1.1 | 291 | 1988 | — |
+| Nona | 945 | 1030 | 0.2 | 202 | 1320 | 165 (single-file) |
+| Brave | 423 | 286 | 1.1 | 291 | 1680 | — |
 | Microsoft Edge | 520 | 300 | 0.6 | 260 | 1500 | — |
-| Mozilla Firefox | 580 | 320 | 0.7 | 240 | 1100 | — |
+| Mozilla Firefox | 580 | 320 | 0.7 | 240 | - | — |
+
+```mermaid
+%%{init: {"theme": "default"}}%%
+xychart-beta
+  title "Idle RAM ~10 tabs total (MB) — lower is better"
+  x-axis ["Nona","Brave","Microsoft Edge"]
+  y-axis "MB" 0 --> 2000
+  bar [1320, 1680, 1500]
+```
 
 Notes
 - Cold/Warm start: Nona is intentionally slower than established browsers. Reasons include .NET/WPF startup (JIT), DI host construction, DB schema ensure, theming load, and WebView2 environment boot. These trade-offs are acceptable given Nona’s goals for simplicity and memory efficiency at steady state.
-- Idle RAM with many tabs: Nona is significantly lower in our measurements (see explanation below).
+- Process accounting: On Windows, Nona uses multiple processes (e.g., `Nona.exe` and `WebView2*`). To compare fairly with Chromium-based browsers that show an aggregated "Brave" process, sum Nona’s `Nona.exe` + `WebView2*` working sets. After correction, Nona’s ~10-tab total RAM is comparable to Brave or lower.
 
-Why ~2 GB RAM for Brave with ~10 tabs but ~200 MB for Nona?
-Based on the project’s code and runtime behavior:
-- Shared WebView2 environment per window: `Nona.Engine.WebEngine.GetEnvironmentAsync()` caches a single `CoreWebView2Environment` for all tabs and passes it to each `WebView2` via `EnsureCoreWebView2Async(env)`. Combined with the startup argument `--process-per-site`, this reduces renderer process proliferation compared to fully site-isolated, per-tab strategies common in Chromium-based browsers.
-- Aggressive network-level blocking: `Nona.Security.ExtendedRulesEngine` performs multi-layer checks (host/wildcard/substring/regex) and whitelisting, short-circuiting many third-party requests. Fewer subresources means fewer renderer frames, simpler DOMs, and lower memory per tab.
-- Minimal feature surface: In `Nona.Engine.WebEngine.ConfigureWebViewAsync`, default context menus, general autofill, and password autosave are disabled; DevTools are off by default. There is no extensions platform, and no multi-process extension hosts consuming RAM.
-- Local NTP and trusted CDNs: A virtual host maps `ntp.nona` to local assets, keeping the default tab extremely light. Rules explicitly allow essential CDNs and media endpoints, avoiding heavy fallbacks and retries that waste RAM.
-- Background work reduced: Startup arguments like `--disable-background-networking`, `--disable-background-timer-throttling`, and `--disable-renderer-backgrounding` limit background services and timers that otherwise accumulate overhead across many tabs.
-- Batching and cleanup: History writes are batched, thumbnails are saved on demand, and tabs are explicitly disposed on close with media teardown to avoid leaks.
+Why the earlier RAM discrepancy?
+- Different process models in Task Manager: Nona (WebView2 host) appears as multiple processes (`Nona.exe`, `WebView2Manager`, and child WebView2 processes). Brave often appears aggregated under the `Brave` process name. If you read only `Nona.exe`, memory looks artificially low.
+- How to measure properly: In Task Manager → Details, filter and sum `Nona.exe` + `WebView2*` working sets for Nona; compare with Brave’s aggregated processes. Alternatively, use Resource Monitor or scripts to sum by process name.
+- What design choices still help: Nona shares a single WebView2 environment per window (`WebEngine.GetEnvironmentAsync`), applies lean defaults in `ConfigureWebViewAsync`, and blocks many third‑party requests (`ExtendedRulesEngine`). These reduce background work and network/CPU overhead, but total memory with many active tabs remains largely dictated by the Chromium multi-process model, so totals are similar to Brave.
 
 Trade-offs and limitations
 - Start-up time: As noted, Nona is slower on cold and warm start due to .NET runtime, DI setup, first-time JIT, and environment initialization. These are areas for future improvement (e.g., trimming, ReadyToRun, delayed services).
