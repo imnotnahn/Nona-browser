@@ -26,6 +26,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Warning()
             .WriteTo.File("nona.log")
             .CreateLogger();
 
@@ -50,7 +51,8 @@ public partial class App : Application
             .ConfigureServices(services =>
             {
                 services.AddSingleton<TabManager>().AddSingleton<ITabManager>(sp => sp.GetRequiredService<TabManager>());
-                services.AddDbContext<NonaDbContext>();
+                // Use DbContextFactory to avoid long-lived DbContext instances and improve responsiveness
+                services.AddDbContextFactory<NonaDbContext>();
                 services.AddSingleton<IHistoryRepository, HistoryRepository>();
                 services.AddSingleton<IBookmarksRepository, BookmarksRepository>();
                 services.AddSingleton<IThumbnailRepository, ThumbnailRepository>();
@@ -74,7 +76,8 @@ public partial class App : Application
         try
         {
             using var scope = _host.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<NonaDbContext>();
+            var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<NonaDbContext>>();
+            using var db = dbFactory.CreateDbContext();
             db.Database.EnsureCreated();
         }
         catch (Exception ex)
@@ -99,6 +102,21 @@ public partial class App : Application
 
         // Start theme watcher for live preview
         try { _host.Services.GetRequiredService<IThemeWatcher>().StartWatching(AppContext.BaseDirectory); } catch { }
+
+        // Pre-warm WebView2 environment on background to reduce first-tab cost
+        try
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var engine = _host.Services.GetRequiredService<IWebEngine>();
+                    await engine.GetEnvironmentAsync();
+                }
+                catch { }
+            });
+        }
+        catch { }
     }
 
     protected override void OnExit(ExitEventArgs e)

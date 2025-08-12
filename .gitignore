@@ -35,4 +35,8 @@ Desktop.ini
 packages/
 *.nupkg
 
+#other
+result.txt
+run_xx.ps1
+
 

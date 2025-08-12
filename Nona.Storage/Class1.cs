@@ -45,17 +45,29 @@ public sealed class NonaDbContext : DbContext
 public interface IHistoryRepository
 {
     Task AddAsync(string url, string? title);
+    Task AddBatchAsync(IEnumerable<(string url, string? title)> items);
 }
 
 public sealed class HistoryRepository : IHistoryRepository
 {
-    private readonly NonaDbContext _db;
-    public HistoryRepository(NonaDbContext db) { _db = db; }
+    private readonly IDbContextFactory<NonaDbContext> _factory;
+    public HistoryRepository(IDbContextFactory<NonaDbContext> factory) { _factory = factory; }
 
     public async Task AddAsync(string url, string? title)
     {
-        _db.History.Add(new HistoryEntry { Url = url, Title = title ?? string.Empty, VisitedAt = DateTimeOffset.UtcNow });
-        await _db.SaveChangesAsync();
+        await using var db = _factory.CreateDbContext();
+        db.History.Add(new HistoryEntry { Url = url, Title = title ?? string.Empty, VisitedAt = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync();
+    }
+
+    public async Task AddBatchAsync(IEnumerable<(string url, string? title)> items)
+    {
+        await using var db = _factory.CreateDbContext();
+        foreach (var (url, title) in items)
+        {
+            db.History.Add(new HistoryEntry { Url = url, Title = title ?? string.Empty, VisitedAt = DateTimeOffset.UtcNow });
+        }
+        await db.SaveChangesAsync();
     }
 }
 
@@ -74,28 +86,30 @@ public interface IThumbnailRepository
 
 public sealed class ThumbnailRepository : IThumbnailRepository
 {
-    private readonly NonaDbContext _db;
-    public ThumbnailRepository(NonaDbContext db) { _db = db; }
+    private readonly IDbContextFactory<NonaDbContext> _factory;
+    public ThumbnailRepository(IDbContextFactory<NonaDbContext> factory) { _factory = factory; }
 
     public async Task SaveAsync(string url, string filePath)
     {
-        var entity = await _db.Thumbnails.FindAsync(url);
+        await using var db = _factory.CreateDbContext();
+        var entity = await db.Thumbnails.FindAsync(url);
         if (entity == null)
         {
             entity = new PageThumbnail { Url = url, FilePath = filePath, CreatedAt = DateTimeOffset.UtcNow };
-            _db.Thumbnails.Add(entity);
+            db.Thumbnails.Add(entity);
         }
         else
         {
             entity.FilePath = filePath;
             entity.CreatedAt = DateTimeOffset.UtcNow;
         }
-        await _db.SaveChangesAsync();
+        await db.SaveChangesAsync();
     }
 
     public async Task<string?> GetPathAsync(string url)
     {
-        var entity = await _db.Thumbnails.FindAsync(url);
+        await using var db = _factory.CreateDbContext();
+        var entity = await db.Thumbnails.FindAsync(url);
         return entity?.FilePath;
     }
 }
@@ -121,34 +135,38 @@ public interface IBookmarksRepository
 
 public sealed class BookmarksRepository : IBookmarksRepository
 {
-    private readonly NonaDbContext _db;
-    public BookmarksRepository(NonaDbContext db) { _db = db; }
+    private readonly IDbContextFactory<NonaDbContext> _factory;
+    public BookmarksRepository(IDbContextFactory<NonaDbContext> factory) { _factory = factory; }
 
     public async Task AddAsync(string title, string url, int? parentFolderId = null)
     {
-        _db.Bookmarks.Add(new Bookmark { Title = title, Url = url, ParentFolderId = parentFolderId });
-        await _db.SaveChangesAsync();
+        await using var db = _factory.CreateDbContext();
+        db.Bookmarks.Add(new Bookmark { Title = title, Url = url, ParentFolderId = parentFolderId });
+        await db.SaveChangesAsync();
     }
 
     public async Task<List<Bookmark>> ListAsync(int? parentFolderId = null)
     {
-        if (parentFolderId == null) return await _db.Bookmarks.ToListAsync();
-        return await _db.Bookmarks.AsQueryable().Where(b => b.ParentFolderId == parentFolderId).ToListAsync();
+        await using var db = _factory.CreateDbContext();
+        if (parentFolderId == null) return await db.Bookmarks.AsNoTracking().ToListAsync();
+        return await db.Bookmarks.AsNoTracking().Where(b => b.ParentFolderId == parentFolderId).ToListAsync();
     }
 
     public async Task DeleteAsync(int id)
     {
-        var bookmark = await _db.Bookmarks.FindAsync(id);
+        await using var db = _factory.CreateDbContext();
+        var bookmark = await db.Bookmarks.FindAsync(id);
         if (bookmark != null)
         {
-            _db.Bookmarks.Remove(bookmark);
-            await _db.SaveChangesAsync();
+            db.Bookmarks.Remove(bookmark);
+            await db.SaveChangesAsync();
         }
     }
 
     public async Task<Bookmark?> FindByUrlAsync(string url)
     {
-        return await _db.Bookmarks.FirstOrDefaultAsync(b => b.Url == url);
+        await using var db = _factory.CreateDbContext();
+        return await db.Bookmarks.AsNoTracking().FirstOrDefaultAsync(b => b.Url == url);
     }
 }
 

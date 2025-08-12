@@ -68,27 +68,39 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        await RestoreSessionAsync();
-        // Load ad blocking rules
         try
         {
-            var rulesPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "rules");
-            if (System.IO.Directory.Exists(rulesPath))
+            var baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Nona", "Default");
+            var sessionFile = Path.Combine(baseDir, "session.json");
+            if (File.Exists(sessionFile))
             {
-                var files = System.IO.Directory.GetFiles(rulesPath, "*.txt");
-                Console.WriteLine($"Loading ad blocking rules from {files.Length} files...");
-                await _rules.LoadListsAsync(files);
-                Console.WriteLine("Ad blocking rules loaded successfully!");
+                // Restore in the background without blocking UI
+                _ = RestoreSessionAsync();
             }
             else
             {
-                Console.WriteLine("Rules directory not found, ad blocking disabled.");
+                // Instant local NTP for fastest perceived startup
+                await CreateTab("https://ntp.nona/index.html");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Error loading ad blocking rules: {ex.Message}");
+            await CreateTab("https://ntp.nona/index.html");
         }
+            // Load ad blocking rules (background to speed up startup)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var rulesPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "rules");
+                    if (System.IO.Directory.Exists(rulesPath))
+                    {
+                        var files = System.IO.Directory.GetFiles(rulesPath, "*.txt");
+                        await _rules.LoadListsAsync(files);
+                    }
+                }
+                catch { }
+            });
 
         // Apply adblock mode from saved settings
         try
@@ -105,7 +117,7 @@ public partial class MainWindow : Window
         }
         catch { }
 
-        // Load bookmarks to bar
+        // Load bookmarks to bar (does minimal DB read)
         try { await LoadBookmarksBarAsync(); } catch { }
         
         // Update background image
@@ -123,6 +135,13 @@ public partial class MainWindow : Window
                 bitmap.BeginInit();
                 bitmap.UriSource = new Uri(backgroundPath, UriKind.Absolute);
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.CreateOptions = BitmapCreateOptions.DelayCreation;
+                // Decode at approximately control size to save memory/time
+                if (BackgroundImage.ActualWidth > 0 && BackgroundImage.ActualHeight > 0)
+                {
+                    bitmap.DecodePixelWidth = (int)Math.Max(1, BackgroundImage.ActualWidth);
+                    bitmap.DecodePixelHeight = (int)Math.Max(1, BackgroundImage.ActualHeight);
+                }
                 bitmap.EndInit();
                 
                 BackgroundImage.Source = bitmap;
@@ -315,7 +334,7 @@ public partial class MainWindow : Window
 
     private async void NewTab_Click(object sender, RoutedEventArgs e)
     {
-        await CreateTab("https://www.bing.com");
+        await CreateTab("https://ntp.nona/index.html");
     }
 
     private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -383,7 +402,8 @@ public partial class MainWindow : Window
             {
                 SetTabHeader(currentTab, docTitle);
             }
-            _ = _history.AddAsync(_web.CoreWebView2.Source, _web.CoreWebView2.DocumentTitle);
+            // Queue history write to reduce DB churn
+            QueueHistory(_web.CoreWebView2.Source, _web.CoreWebView2.DocumentTitle);
             _ = SaveThumbnailAsync(_web);
         }
     }
@@ -581,9 +601,13 @@ public partial class MainWindow : Window
         if (web?.CoreWebView2 == null || _thumbRepo == null) return;
         try
         {
+            // Skip thumbnails for non-http/https or localhost ntp
+            var src = web.CoreWebView2.Source ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(src) || src.StartsWith("about:") || src.Contains("ntp.nona")) return;
+
             var baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Nona", "Default", "thumbs");
             Directory.CreateDirectory(baseDir);
-            var url = web.CoreWebView2.Source ?? string.Empty;
+            var url = src;
             if (string.IsNullOrWhiteSpace(url)) return;
             var safeName = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(url)).Replace('/', '_');
             var file = Path.Combine(baseDir, safeName + ".png");
@@ -616,19 +640,29 @@ public partial class MainWindow : Window
             var sessionFile = Path.Combine(baseDir, "session.json");
             if (!File.Exists(sessionFile))
             {
-                await CreateTab("https://www.bing.com");
+                await CreateTab("https://ntp.nona/index.html");
                 return;
             }
             var json = await File.ReadAllTextAsync(sessionFile);
             var session = JsonSerializer.Deserialize<Nona.Core.SessionState>(json) ?? new Nona.Core.SessionState();
             if (session.Tabs.Count == 0)
             {
-                await CreateTab("https://www.bing.com");
+                await CreateTab("https://ntp.nona/index.html");
                 return;
             }
+            var isFirst = true;
             foreach (var t in session.Tabs)
             {
-                await CreateTab(t.Address);
+                if (isFirst)
+                {
+                    await CreateTab(t.Address);
+                    isFirst = false;
+                }
+                else
+                {
+                    _ = CreateTab(t.Address);
+                    await Task.Delay(50);
+                }
             }
             if (session.ActiveIndex >= 0 && session.ActiveIndex < Tabs.Items.Count)
             {
@@ -637,7 +671,7 @@ public partial class MainWindow : Window
         }
         catch
         {
-            await CreateTab("https://www.bing.com");
+            await CreateTab("https://ntp.nona/index.html");
         }
     }
 
@@ -775,6 +809,46 @@ public partial class MainWindow : Window
         _commands.Register("goto-stackoverflow", "Go to Stack Overflow", () => NavigateToUrl("https://stackoverflow.com"));
     }
 
+    // Simple in-memory queue for batching history writes
+    private static readonly object _historyLock = new();
+    private static readonly Queue<(string url, string? title)> _historyQueue = new();
+    private static bool _historyFlusherStarted = false;
+    private void QueueHistory(string url, string? title)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return;
+        lock (_historyLock)
+        {
+            _historyQueue.Enqueue((url, title));
+            if (!_historyFlusherStarted)
+            {
+                _historyFlusherStarted = true;
+                _ = Task.Run(async () =>
+                {
+                    while (true)
+                    {
+                        (string url, string? title)[] batch;
+                        lock (_historyLock)
+                        {
+                            if (_historyQueue.Count == 0)
+                            {
+                                _historyFlusherStarted = false;
+                                break;
+                            }
+                            batch = _historyQueue.ToArray();
+                            _historyQueue.Clear();
+                        }
+                        try
+                        {
+                            await _history.AddBatchAsync(batch);
+                        }
+                        catch { }
+                        await Task.Delay(150);
+                    }
+                });
+            }
+        }
+    }
+
     private void SwitchTheme(string themeName)
     {
         try
@@ -799,7 +873,8 @@ public partial class MainWindow : Window
             try
             {
                 using var scope = ((App)Application.Current).Services.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<Nona.Storage.NonaDbContext>();
+                var factory = scope.ServiceProvider.GetRequiredService<Microsoft.EntityFrameworkCore.IDbContextFactory<Nona.Storage.NonaDbContext>>();
+                await using var db = factory.CreateDbContext();
                 db.History.RemoveRange(db.History);
                 await db.SaveChangesAsync();
                 // History cleared successfully

@@ -9,17 +9,18 @@ namespace Nona.App.Windows;
 
 public partial class DownloadsWindow : Window
 {
-    private readonly Nona.Storage.NonaDbContext _db;
+    private readonly Microsoft.EntityFrameworkCore.IDbContextFactory<Nona.Storage.NonaDbContext> _dbFactory;
     public DownloadsWindow()
     {
         InitializeComponent();
-        _db = ((App)Application.Current).Services.GetRequiredService<Nona.Storage.NonaDbContext>();
+        _dbFactory = ((App)Application.Current).Services.GetRequiredService<Microsoft.EntityFrameworkCore.IDbContextFactory<Nona.Storage.NonaDbContext>>();
         LoadGrid();
     }
 
     private void LoadGrid()
     {
-        Grid.ItemsSource = _db.Downloads.AsNoTracking().AsEnumerable().OrderByDescending(d => d.CreatedAt).ToList();
+        using var db = _dbFactory.CreateDbContext();
+        Grid.ItemsSource = db.Downloads.AsNoTracking().AsEnumerable().OrderByDescending(d => d.CreatedAt).ToList();
     }
 
     private void OpenFolder_Click(object sender, RoutedEventArgs e)

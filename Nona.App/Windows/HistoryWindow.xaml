@@ -14,14 +14,16 @@
                Foreground="{DynamicResource ForegroundColor}" Margin="0,0,0,20"/>
     
     <TextBox x:Name="Filter" Grid.Row="1" Margin="0,0,0,15" Height="36"
-             Style="{DynamicResource ModernTextBoxStyle}"
-             Text="Search history..."/>
+             Style="{DynamicResource ModernTextBoxStyle}"/>
     
     <ListView x:Name="List" Grid.Row="2"
               Background="Transparent"
               BorderBrush="{DynamicResource WindowBorderColor}"
-              BorderThickness="1"
-              Foreground="{DynamicResource ForegroundColor}">
+               BorderThickness="1"
+               Foreground="{DynamicResource ForegroundColor}"
+               VirtualizingPanel.IsVirtualizing="True"
+               VirtualizingPanel.VirtualizationMode="Recycling"
+               ScrollViewer.IsDeferredScrollingEnabled="True">
       <ListView.ItemTemplate>
         <DataTemplate>
           <Border Padding="12,8" Margin="0,1" Background="Transparent">

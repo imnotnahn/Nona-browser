@@ -27,7 +27,10 @@ public sealed class WebEngine : IWebEngine
         var userDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Nona", profileName, "WebView2");
         Directory.CreateDirectory(userDataFolder);
 
-        var options = new CoreWebView2EnvironmentOptions();
+        // Optimize WebView2 startup
+        var options = new CoreWebView2EnvironmentOptions(additionalBrowserArguments: "--disable-background-networking --disable-background-timer-throttling --disable-renderer-backgrounding --process-per-site")
+        {
+        };
 
         _environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder, options: options);
         return _environment;
@@ -35,11 +38,14 @@ public sealed class WebEngine : IWebEngine
 
     public async Task ConfigureWebViewAsync(CoreWebView2 core, IRulesEngine rulesEngine)
     {
-        // Allow accelerator keys and devtools
-        core.Settings.AreDefaultContextMenusEnabled = true;
-        core.Settings.AreDevToolsEnabled = true;
+        // Leaner defaults for faster startup
+        core.Settings.AreDefaultContextMenusEnabled = false;
+        core.Settings.AreDevToolsEnabled = false;
         core.Settings.AreBrowserAcceleratorKeysEnabled = true;
         core.Settings.IsPinchZoomEnabled = true;
+        core.Settings.IsStatusBarEnabled = false;
+        core.Settings.IsGeneralAutofillEnabled = false;
+        core.Settings.IsPasswordAutosaveEnabled = false;
 
         // Map virtual host for custom NTP assets
         var appDir = AppContext.BaseDirectory;
@@ -129,31 +135,31 @@ public interface IDownloadsManager
     void Track(CoreWebView2 core);
 }
 
-public sealed class DownloadsManager : IDownloadsManager
-{
-    private readonly Nona.Storage.NonaDbContext _db;
-    public DownloadsManager(Nona.Storage.NonaDbContext db) { _db = db; }
+    public sealed class DownloadsManager : IDownloadsManager
+    {
+        private readonly Nona.Storage.NonaDbContext _db;
+        public DownloadsManager(Nona.Storage.NonaDbContext db) { _db = db; }
 
     public void Track(CoreWebView2 core)
     {
-        core.DownloadStarting += (s, e) =>
+            core.DownloadStarting += (s, e) =>
         {
             var op = e.DownloadOperation;
-            var entity = new Nona.Storage.DownloadItem { Url = op.Uri, FilePath = op.ResultFilePath, State = op.State.ToString(), BytesReceived = 0 };
-            _ = _db.Downloads.Add(entity);
-            _ = _db.SaveChangesAsync();
+                var entity = new Nona.Storage.DownloadItem { Url = op.Uri, FilePath = op.ResultFilePath, State = op.State.ToString(), BytesReceived = 0 };
+                _ = _db.Downloads.Add(entity);
+                _ = _db.SaveChangesAsync();
             op.BytesReceivedChanged += (ss, aa) =>
             {
-                entity.BytesReceived = (long)op.BytesReceived;
-                entity.TotalBytes = (long?)op.TotalBytesToReceive;
-                entity.State = op.State.ToString();
-                _ = _db.SaveChangesAsync();
+                    entity.BytesReceived = (long)op.BytesReceived;
+                    entity.TotalBytes = (long?)op.TotalBytesToReceive;
+                    entity.State = op.State.ToString();
+                    _ = _db.SaveChangesAsync();
             };
             op.StateChanged += (ss, aa) =>
             {
-                entity.State = op.State.ToString();
-                entity.FilePath = op.ResultFilePath;
-                _ = _db.SaveChangesAsync();
+                    entity.State = op.State.ToString();
+                    entity.FilePath = op.ResultFilePath;
+                    _ = _db.SaveChangesAsync();
             };
         };
     }

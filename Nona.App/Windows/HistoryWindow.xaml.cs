@@ -14,13 +14,32 @@ public sealed class HistoryItemVM
 
 public partial class HistoryWindow : Window
 {
-    private readonly Nona.Storage.NonaDbContext _db;
+    private readonly Microsoft.EntityFrameworkCore.IDbContextFactory<Nona.Storage.NonaDbContext> _dbFactory;
     public HistoryWindow()
     {
         InitializeComponent();
-        _db = ((App)Application.Current).Services.GetRequiredService<Nona.Storage.NonaDbContext>();
+        _dbFactory = ((App)Application.Current).Services.GetRequiredService<Microsoft.EntityFrameworkCore.IDbContextFactory<Nona.Storage.NonaDbContext>>();
         LoadList();
-        Filter.TextChanged += (_, __) => LoadList();
+        // Debounce filter change to avoid frequent DB queries
+        System.Windows.Threading.DispatcherTimer? timer = null;
+        Filter.TextChanged += (_, __) =>
+        {
+            timer ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            timer.Stop();
+            timer.Tick -= Timer_Tick;
+            timer.Tick += Timer_Tick;
+            timer.Start();
+        };
+    }
+
+    private void Timer_Tick(object? sender, EventArgs e)
+    {
+        if (sender is System.Windows.Threading.DispatcherTimer t)
+        {
+            t.Stop();
+            t.Tick -= Timer_Tick;
+        }
+        LoadList();
     }
 
     private void LoadList()
@@ -30,7 +49,8 @@ public partial class HistoryWindow : Window
             var q = Filter.Text?.Trim() ?? string.Empty;
             
             // Get history items from database
-            var historyQuery = _db.History.AsNoTracking();
+            using var db = _dbFactory.CreateDbContext();
+            var historyQuery = db.History.AsNoTracking();
             
             if (!string.IsNullOrEmpty(q))
             {
