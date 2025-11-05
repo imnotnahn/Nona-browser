@@ -102,21 +102,6 @@ public partial class App : Application
 
         // Start theme watcher for live preview
         try { _host.Services.GetRequiredService<IThemeWatcher>().StartWatching(AppContext.BaseDirectory); } catch { }
-
-        // Pre-warm WebView2 environment on background to reduce first-tab cost
-        try
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var engine = _host.Services.GetRequiredService<IWebEngine>();
-                    await engine.GetEnvironmentAsync();
-                }
-                catch { }
-            });
-        }
-        catch { }
     }
 
     protected override void OnExit(ExitEventArgs e)

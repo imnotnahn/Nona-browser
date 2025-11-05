@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JavaScript Test Page</title>
+</head>
+<body>
+    <h1>Nona Browser - JavaScript Test</h1>
+    
+    <div id="results"></div>
+    
+    <script>
+        var results = [];
+        
+        // Test 1: Basic JavaScript
+        results.push("✅ Basic JavaScript works");
+        
+        // Test 2: navigator.javaEnabled
+        if (navigator.javaEnabled && navigator.javaEnabled()) {
+            results.push("✅ navigator.javaEnabled() = true");
+        } else {
+            results.push("❌ navigator.javaEnabled() failed");
+        }
+        
+        // Test 3: window object
+        if (typeof window === 'object') {
+            results.push("✅ window object exists");
+        } else {
+            results.push("❌ window object missing");
+        }
+        
+        // Test 4: window.google
+        if (typeof window.google === 'object') {
+            results.push("✅ window.google exists");
+        } else {
+            results.push("❌ window.google missing");
+        }
+        
+        // Test 5: document object
+        if (typeof document === 'object') {
+            results.push("✅ document object exists");
+        } else {
+            results.push("❌ document object missing");
+        }
+        
+        // Test 6: addEventListener (won't error even if element is null)
+        try {
+            var testEl = document.getElementById('results');
+            if (testEl && testEl.addEventListener) {
+                testEl.addEventListener('click', function() {});
+                results.push("✅ addEventListener exists");
+            } else {
+                results.push("⚠️ addEventListener not found on element");
+            }
+        } catch(e) {
+            results.push("❌ addEventListener error: " + e.message);
+        }
+        
+        // Test 7: User Agent
+        if (navigator.userAgent.indexOf('Chrome') > -1) {
+            results.push("✅ User Agent contains 'Chrome'");
+        } else {
+            results.push("⚠️ User Agent: " + navigator.userAgent);
+        }
+        
+        // Test 8: Screen object
+        if (window.screen && window.screen.width) {
+            results.push("✅ window.screen.width = " + window.screen.width);
+        } else {
+            results.push("❌ window.screen missing");
+        }
+        
+        // Display results
+        var resultDiv = document.getElementById('results');
+        if (resultDiv) {
+            resultDiv.innerHTML = '<h2>Test Results:</h2><ul><li>' + 
+                results.join('</li><li>') + '</li></ul>';
+        }
+        
+        // Also log to console
+        console.log("=== JavaScript Test Results ===");
+        for (var i = 0; i < results.length; i++) {
+            console.log(results[i]);
+        }
+        console.log("=== End of Tests ===");
+    </script>
+    
+    <h2>Manual Tests</h2>
+    <p>Open DevTools (F12) and run:</p>
+    <pre>
+navigator.javaEnabled()           // Should return: true
+window.google                     // Should return: {}
+window.screen.width               // Should return: 1920
+navigator.userAgent               // Should contain: Chrome
+    </pre>
+</body>
+</html>
+

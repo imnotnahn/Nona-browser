@@ -3,8 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.Wpf;
 using Nona.Engine;
 using Nona.Security;
 using System.Threading.Tasks;
@@ -30,7 +28,7 @@ public partial class MainWindow : Window
     private readonly IHistoryRepository _history;
     private readonly IThumbnailRepository? _thumbRepo;
 
-    private WebView2? _web;
+    private BrowserControl? _web;
     private readonly IBookmarksRepository _bookmarks;
     private readonly ICommandRegistry _commands;
     private readonly IDownloadsManager _downloads;
@@ -64,6 +62,33 @@ public partial class MainWindow : Window
         CommandBindings.Add(new CommandBinding(NavigationCommands.Refresh, (_, __) => Reload_Click(null!, null!)));
         CommandBindings.Add(new CommandBinding(NavigationCommands.BrowseForward, (_, __) => Forward_Click(null!, null!)));
         RegisterCommands();
+        
+        // Setup Omnibox placeholder behavior
+        SetupOmniboxPlaceholder();
+    }
+
+    private void SetupOmniboxPlaceholder()
+    {
+        var placeholderText = "Search or enter website name";
+        Omnibox.Foreground = Brushes.Gray;
+        
+        Omnibox.GotFocus += (s, e) =>
+        {
+            if (Omnibox.Text == placeholderText)
+            {
+                Omnibox.Text = "";
+                Omnibox.Foreground = (Brush)FindResource("ForegroundColor");
+            }
+        };
+        
+        Omnibox.LostFocus += (s, e) =>
+        {
+            if (string.IsNullOrWhiteSpace(Omnibox.Text))
+            {
+                Omnibox.Text = placeholderText;
+                Omnibox.Foreground = Brushes.Gray;
+            }
+        };
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -183,24 +208,88 @@ public partial class MainWindow : Window
 
     private async void NavigateFromOmnibox()
     {
-        if (_web?.CoreWebView2 == null) return;
+        if (_web == null) return;
         var text = Omnibox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(text)) return;
+        
+        // Ignore if placeholder text
+        if (string.IsNullOrWhiteSpace(text) || text == "Search or enter website name") 
+            return;
         
         Uri uri;
-        if (Uri.TryCreate(text, UriKind.Absolute, out var abs))
+        
+        // Smart URL detection
+        if (IsUrl(text))
         {
-            uri = abs;
+            // Add https:// if no scheme
+            if (!text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
+                !text.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                !text.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            {
+                // If it's a Windows absolute path, navigate as file
+                if (System.IO.Path.IsPathRooted(text) && System.IO.File.Exists(text))
+                {
+                    text = new Uri(text).ToString();
+                }
+                else
+                {
+                    text = "https://" + text;
+                }
+            }
+            uri = new Uri(text);
         }
         else
         {
-            // Get search engine from settings
+            // It's a search query - use search engine
             var searchEngine = await GetSearchEngineAsync();
             uri = new Uri(searchEngine + Uri.EscapeDataString(text));
         }
         
-        var upgraded = _httpsOnly.TryUpgrade(uri) ?? uri;
-        _web.CoreWebView2.Navigate(upgraded.ToString());
+        // Don't upgrade non-http schemes like file://
+        var upgraded = (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            ? (_httpsOnly.TryUpgrade(uri) ?? uri)
+            : uri;
+        _web.Navigate(upgraded.ToString());
+    }
+
+    private bool IsUrl(string text)
+    {
+        // Check if it looks like a URL:
+        // - Contains a dot (domain.com)
+        // - Doesn't contain spaces
+        // - Starts with http:// or https://
+        // - Has TLD pattern
+        
+        if (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+            text.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return true;
+        
+        // Allow file:// scheme and Windows absolute paths
+        if (text.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (System.IO.Path.IsPathRooted(text) && System.IO.File.Exists(text))
+            return true;
+
+        // Check for domain pattern: xxx.xxx
+        if (text.Contains('.') && !text.Contains(' '))
+        {
+            // Additional checks
+            var parts = text.Split('.');
+            if (parts.Length >= 2)
+            {
+                var lastPart = parts[^1];
+                // Check if last part looks like TLD (2-6 chars, no numbers only)
+                if (lastPart.Length >= 2 && lastPart.Length <= 6 && !int.TryParse(lastPart, out _))
+                {
+                    return true;
+                }
+            }
+        }
+        
+        // Special cases
+        if (text.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+            return true;
+        
+        return false;
     }
 
     private async Task<string> GetSearchEngineAsync()
@@ -231,75 +320,55 @@ public partial class MainWindow : Window
         {
             var tab = new TabItem();
             var grid = new Grid();
-            var web = new WebView2();
+            var web = _engine.CreateBrowserControl();
+            
+            // Configure browser with rules engine
+            _engine.ConfigureBrowser(web, _rules);
             
             // Add event handlers
-            web.NavigationCompleted += Web_NavigationCompleted;
-            web.CoreWebView2InitializationCompleted += async (s, e) =>
+            web.NavigationCompleted += (s, e) =>
             {
-                if (e.IsSuccess)
+                Web_NavigationCompleted(s, e);
+                
+                // Update tab title
+                foreach (TabItem tabItem in Tabs.Items)
                 {
-                    try
+                    if (tabItem.Content is Grid g && 
+                        g.Children.Count > 0 && 
+                        g.Children[0] == web)
                     {
-                        web.CoreWebView2.DownloadStarting += CoreWebView2_DownloadStarting;
-                        web.CoreWebView2.DocumentTitleChanged += (sender, args) =>
+                        var title = web.DocumentTitle;
+                        SetTabHeader(tabItem, title);
+                        
+                        // Update window title if this is the active tab
+                        if (tabItem == Tabs.SelectedItem)
                         {
-                            // Find the tab that belongs to this WebView2
-                            foreach (TabItem tabItem in Tabs.Items)
-                            {
-                                if (tabItem.Content is Grid grid && 
-                                    grid.Children.Count > 0 && 
-                                    grid.Children[0] == web)
-                                {
-                                    var title = web.CoreWebView2.DocumentTitle;
-                                    if (string.IsNullOrWhiteSpace(title))
-                                    {
-                                        try
-                                        {
-                                            var uri = new Uri(web.CoreWebView2.Source);
-                                            title = uri.Host;
-                                        }
-                                        catch
-                                        {
-                                            title = "Loading...";
-                                        }
-                                    }
-                                    SetTabHeader(tabItem, title);
-                                    
-                                    // Update window title if this is the active tab
-                                    if (tabItem == Tabs.SelectedItem)
-                                    {
-                                        Title = title;
-                                    }
-                                    break;
-                                }
-                            }
-                        };
-
-                        // Handle new window requests
-                        web.CoreWebView2.NewWindowRequested += (s, args) => { 
-                            args.Handled = true; 
-                            web.CoreWebView2.Navigate(args.Uri); 
-                        };
-
-                        // Configure web engine and rules
-                        await _engine.ConfigureWebViewAsync(web.CoreWebView2, _rules);
-                        _downloads.Track(web.CoreWebView2);
-
-                        // Navigate to initial URL if provided
-                        if (!string.IsNullOrWhiteSpace(initialUrl))
-                        {
-                            web.CoreWebView2.Navigate(initialUrl);
+                            Title = title;
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error configuring WebView2: {ex.Message}");
+                        break;
                     }
                 }
-                else
+            };
+
+            web.TitleChanged += (s, e) =>
+            {
+                // Find the tab that belongs to this browser
+                foreach (TabItem tabItem in Tabs.Items)
                 {
-                    Console.WriteLine("WebView2 initialization failed");
+                    if (tabItem.Content is Grid g && 
+                        g.Children.Count > 0 && 
+                        g.Children[0] == web)
+                    {
+                        var title = web.DocumentTitle;
+                        SetTabHeader(tabItem, title);
+                        
+                        // Update window title if this is the active tab
+                        if (tabItem == Tabs.SelectedItem)
+                        {
+                            Title = title;
+                        }
+                        break;
+                    }
                 }
             };
 
@@ -310,20 +379,14 @@ public partial class MainWindow : Window
 
             _web = web;
             
-            // Initialize WebView2 environment
-            var env = await _engine.GetEnvironmentAsync();
-            await web.EnsureCoreWebView2Async(env);
-            try
-            {
-                // Reduce white flash when creating/switching tabs by matching background color
-                var mediaColor = GetThemeBackgroundMediaColor();
-                var drawingColor = System.Drawing.Color.FromArgb(mediaColor.A, mediaColor.R, mediaColor.G, mediaColor.B);
-                web.DefaultBackgroundColor = drawingColor;
-            }
-            catch { }
-            
             // Set initial tab title
             SetTabHeader(tab, "New Tab");
+            
+            // Navigate to initial URL if provided
+            if (!string.IsNullOrWhiteSpace(initialUrl))
+            {
+                await web.NavigateAsync(initialUrl);
+            }
         }
         catch (Exception ex)
         {
@@ -341,11 +404,11 @@ public partial class MainWindow : Window
     {
         if (Tabs.SelectedItem is TabItem ti && ti.Content is Grid g && g.Children.Count > 0)
         {
-            _web = g.Children[0] as WebView2;
-            if (_web?.CoreWebView2 != null)
+            _web = g.Children[0] as BrowserControl;
+            if (_web != null)
             {
-                Omnibox.Text = _web.CoreWebView2.Source ?? string.Empty;
-                Title = _web.CoreWebView2.DocumentTitle ?? "Nona";
+                Omnibox.Text = _web.Source ?? string.Empty;
+                Title = _web.DocumentTitle ?? "Nona";
             }
             else
             {
@@ -357,38 +420,38 @@ public partial class MainWindow : Window
 
     private void Back_Click(object sender, RoutedEventArgs e)
     {
-        if (_web?.CoreWebView2?.CanGoBack == true) _web.CoreWebView2.GoBack();
+        if (_web?.CanGoBack == true) _web.GoBack();
     }
 
     private void Forward_Click(object sender, RoutedEventArgs e)
     {
-        if (_web?.CoreWebView2?.CanGoForward == true) _web.CoreWebView2.GoForward();
+        if (_web?.CanGoForward == true) _web.GoForward();
     }
 
     private void Reload_Click(object sender, RoutedEventArgs e)
     {
-        _web?.CoreWebView2?.Reload();
+        _web?.Reload();
     }
 
     private void Home_Click(object sender, RoutedEventArgs e)
     {
-        if (_web?.CoreWebView2 == null) return;
-        _web.CoreWebView2.Navigate("https://ntp.nona/index.html");
+        if (_web == null) return;
+        _web.Navigate("https://ntp.nona/index.html");
     }
 
-    private void Web_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    private void Web_NavigationCompleted(object? sender, NavigationCompletedEventArgs e)
     {
-        if (_web?.CoreWebView2?.Source != null)
+        if (_web?.Source != null && e.IsSuccess)
         {
-            Omnibox.Text = _web.CoreWebView2.Source;
+            Omnibox.Text = _web.Source;
             
             // Get title with fallback to URL domain
-            var docTitle = _web.CoreWebView2.DocumentTitle;
+            var docTitle = _web.DocumentTitle;
             if (string.IsNullOrWhiteSpace(docTitle))
             {
                 try
                 {
-                    var uri = new Uri(_web.CoreWebView2.Source);
+                    var uri = new Uri(_web.Source);
                     docTitle = uri.Host;
                 }
                 catch
@@ -403,14 +466,13 @@ public partial class MainWindow : Window
                 SetTabHeader(currentTab, docTitle);
             }
             // Queue history write to reduce DB churn
-            QueueHistory(_web.CoreWebView2.Source, _web.CoreWebView2.DocumentTitle);
-            _ = SaveThumbnailAsync(_web);
+            QueueHistory(_web.Source, _web.DocumentTitle);
         }
     }
 
     private void DevTools_Click(object sender, RoutedEventArgs e)
     {
-        _web?.CoreWebView2?.OpenDevToolsWindow();
+        _web?.OpenDevTools();
     }
 
     private void SetTabHeader(TabItem tab, string title)
@@ -435,45 +497,23 @@ public partial class MainWindow : Window
     {
         var idx = Tabs.Items.IndexOf(tab);
         
-        // Properly dispose WebView2 to stop audio/video
+        // Clean up browser control
         if (tab.Content is Grid grid && grid.Children.Count > 0)
         {
-            var webView = grid.Children[0] as WebView2;
-            if (webView != null)
+            var browser = grid.Children[0] as BrowserControl;
+            if (browser != null)
             {
                 try
                 {
-                    // Stop any media playback first
-                    if (webView.CoreWebView2 != null)
-                    {
-                        // Execute JavaScript to stop all media
-                        await webView.CoreWebView2.ExecuteScriptAsync(@"
-                            document.querySelectorAll('audio, video').forEach(el => {
-                                el.pause();
-                                el.currentTime = 0;
-                                el.src = '';
-                                el.load();
-                            });
-                        ");
-                        
-                        // Navigate to blank page to stop any remaining processes
-                        webView.CoreWebView2.Navigate("about:blank");
-                        
-                        // Wait a moment for the navigation to complete
-                        await Task.Delay(100);
-                    }
+                    // Stop any ongoing navigation
+                    browser.Stop();
                     
-                    // Remove event handlers to prevent memory leaks
-                    webView.NavigationCompleted -= Web_NavigationCompleted;
-                    
-                    // Dispose the WebView2
-                    webView.Dispose();
+                    // Clear content to free memory
+                    browser.Content = null;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error disposing WebView2: {ex.Message}");
-                    // Force dispose even if there was an error
-                    try { webView.Dispose(); } catch { }
+                    Console.WriteLine($"Error disposing BrowserControl: {ex.Message}");
                 }
             }
         }
@@ -493,6 +533,8 @@ public partial class MainWindow : Window
         {
             Tabs.SelectedIndex = Math.Max(0, idx - 1);
         }
+        
+        await Task.CompletedTask;
     }
 
     private async Task LoadBookmarksBarAsync()
@@ -510,7 +552,7 @@ public partial class MainWindow : Window
             };
             btn.Click += (_, __) =>
             {
-                _web?.CoreWebView2?.Navigate(b.Url);
+                _web?.Navigate(b.Url);
             };
             
             // Add context menu for bookmark deletion
@@ -534,8 +576,8 @@ public partial class MainWindow : Window
 
     private void AddBookmark_Click(object sender, RoutedEventArgs e)
     {
-        var title = _web?.CoreWebView2?.DocumentTitle ?? "(No title)";
-        var url = _web?.CoreWebView2?.Source ?? string.Empty;
+        var title = _web?.DocumentTitle ?? "(No title)";
+        var url = _web?.Source ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(url))
         {
             _ = _bookmarks.AddAsync(title, url);
@@ -571,24 +613,11 @@ public partial class MainWindow : Window
 
     private async Task HardRefreshAsync()
     {
-        if (_web?.CoreWebView2 == null) return;
-        try
-        {
-            await _web.CoreWebView2.CallDevToolsProtocolMethodAsync("Network.setCacheDisabled", "{\"cacheDisabled\":true}");
-            _web.CoreWebView2.Reload();
-            await Task.Delay(200);
-            await _web.CoreWebView2.CallDevToolsProtocolMethodAsync("Network.setCacheDisabled", "{\"cacheDisabled\":false}");
-        }
-        catch
-        {
-            var url = _web.CoreWebView2.Source;
-            if (!string.IsNullOrWhiteSpace(url))
-            {
-                var buster = $"__nocache={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
-                var newUrl = url.Contains("?") ? url + "&" + buster : url + "?" + buster;
-                _web.CoreWebView2.Navigate(newUrl);
-            }
-        }
+        if (_web == null) return;
+        
+        // For lightweight renderer, just reload the page
+        _web.Reload();
+        await Task.CompletedTask;
     }
 
     private async void HardRefresh_Executed(object? sender, ExecutedRoutedEventArgs e)
@@ -596,41 +625,6 @@ public partial class MainWindow : Window
         await HardRefreshAsync();
     }
 
-    private async Task SaveThumbnailAsync(WebView2? web)
-    {
-        if (web?.CoreWebView2 == null || _thumbRepo == null) return;
-        try
-        {
-            // Skip thumbnails for non-http/https or localhost ntp
-            var src = web.CoreWebView2.Source ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(src) || src.StartsWith("about:") || src.Contains("ntp.nona")) return;
-
-            var baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Nona", "Default", "thumbs");
-            Directory.CreateDirectory(baseDir);
-            var url = src;
-            if (string.IsNullOrWhiteSpace(url)) return;
-            var safeName = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(url)).Replace('/', '_');
-            var file = Path.Combine(baseDir, safeName + ".png");
-            await _engine.CapturePreviewPngAsync(web.CoreWebView2, file);
-            await _thumbRepo.SaveAsync(url, file);
-        }
-        catch { }
-    }
-
-    private void CoreWebView2_DownloadStarting(object? sender, CoreWebView2DownloadStartingEventArgs e)
-    {
-        // Basic downloads UX: let WebView2 download UI run; you can manage e.ResultFilePath and attach handlers
-        var op = e.DownloadOperation;
-        op.BytesReceivedChanged += (s, a) =>
-        {
-            // Download progress tracking can be shown in notifications or downloads window
-        };
-        op.StateChanged += (s, a) =>
-        {
-            // Download state changes can be shown in notifications or downloads window
-        };
-        // For pause/resume control, expose UI later and call op.Pause()/op.Resume()
-    }
 
     private async Task RestoreSessionAsync()
     {
@@ -688,8 +682,8 @@ public partial class MainWindow : Window
                 Tabs = Tabs.Items.OfType<TabItem>()
                     .Select(it =>
                     {
-                        var web = (it.Content as Grid)?.Children.OfType<WebView2>().FirstOrDefault();
-                        var addr = web?.CoreWebView2?.Source ?? "about:blank";
+                        var web = (it.Content as Grid)?.Children.OfType<BrowserControl>().FirstOrDefault();
+                        var addr = web?.Source ?? "about:blank";
                         return new Nona.Core.SessionTab { Address = addr };
                     })
                     .ToList()
@@ -704,38 +698,24 @@ public partial class MainWindow : Window
     {
         await SaveSessionAsync();
         
-        // Dispose all WebView2 instances to prevent resource leaks
+        // Clean up all browser controls
         try
         {
             foreach (TabItem tab in Tabs.Items)
             {
                 if (tab.Content is Grid grid && grid.Children.Count > 0)
                 {
-                    var webView = grid.Children[0] as WebView2;
-                    if (webView != null)
+                    var browser = grid.Children[0] as BrowserControl;
+                    if (browser != null)
                     {
                         try
                         {
-                            if (webView.CoreWebView2 != null)
-                            {
-                                // Stop all media
-                                await webView.CoreWebView2.ExecuteScriptAsync(@"
-                                    document.querySelectorAll('audio, video').forEach(el => {
-                                        el.pause();
-                                        el.currentTime = 0;
-                                        el.src = '';
-                                        el.load();
-                                    });
-                                ");
-                                webView.CoreWebView2.Navigate("about:blank");
-                            }
-                            webView.NavigationCompleted -= Web_NavigationCompleted;
-                            webView.Dispose();
+                            browser.Stop();
+                            browser.Content = null;
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Error disposing WebView2 on app close: {ex.Message}");
-                            try { webView.Dispose(); } catch { }
+                            Console.WriteLine($"Error disposing BrowserControl on app close: {ex.Message}");
                         }
                     }
                 }
@@ -888,17 +868,9 @@ public partial class MainWindow : Window
 
     private void ZoomPage(double factor, bool reset = false)
     {
-        if (_web?.CoreWebView2 == null) return;
-        
-        if (reset)
-        {
-            _web.ZoomFactor = 1.0;
-        }
-        else
-        {
-            _web.ZoomFactor = Math.Max(0.25, Math.Min(4.0, _web.ZoomFactor * factor));
-        }
-        // Zoom level changed - could show in title or notification
+        // Zoom not supported in lightweight renderer
+        MessageBox.Show("Zoom feature is not available in the lightweight rendering engine.", 
+            "Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void ToggleFullScreen()
@@ -909,8 +881,8 @@ public partial class MainWindow : Window
 
     private void NavigateToUrl(string url)
     {
-        if (_web?.CoreWebView2 == null) return;
-        _web.CoreWebView2.Navigate(url);
+        if (_web == null) return;
+        _web.Navigate(url);
         Omnibox.Text = url;
     }
 
@@ -943,8 +915,8 @@ public partial class MainWindow : Window
             
             // Get tab info
             var title = tabItem.Header?.ToString() ?? "New Tab";
-            var web = (tabItem.Content as Grid)?.Children.OfType<WebView2>().FirstOrDefault();
-            var url = web?.CoreWebView2?.Source ?? "";
+            var web = (tabItem.Content as Grid)?.Children.OfType<BrowserControl>().FirstOrDefault();
+            var url = web?.Source ?? "";
             
             // Create tab list item button
             var tabButton = new Button
